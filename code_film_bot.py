@@ -27,13 +27,18 @@ async def check_sub(user_id):
     return False
 
 
-async def fetch_movie_info(code):
-    query = "SELECT title, description, rating FROM codes WHERE code = %s"
+async def fetch_movie_info(message: Message):
+    code: str = message.text.replace('/', '').strip()
+    query = "SELECT title, description, rating, show_link FROM codes WHERE code = %s"
     cursor.execute(query, (code,))
     result = cursor.fetchone()
     if result:
-        title, description, rating = result
-        return f"Вот! Нашёл! Держи инфу!\n\nНазвание: {title}\n\nОписание: {description}\n\nРейтинг: {rating}"
+        title, description, rating, show_link = result
+        show_button: InlineKeyboardButton = InlineKeyboardButton(text='Посмотреть фильм', url=f'{show_link}')
+        keyboard: InlineKeyboardMarkup = InlineKeyboardMarkup(inline_keyboard=[[show_button]])
+        await message.answer(f"Вот! Нашёл! Держи инфу!\n\nНазвание: {title}\n\nОписание: {description}\n\n"
+                             f"Рейтинг: {rating}", reply_markup=keyboard)
+        return True
     return False
 
 
@@ -58,8 +63,8 @@ async def process_check_button(callback: CallbackQuery):
         messages_ids = [message_id+1, message_id]
         for m_i in messages_ids:
             await bot.delete_message(chat_id=user_id, message_id=m_i)
-        await callback.message.answer('Пасиба, родной, за подписку, однако, тепепрь, ты не сможешь выйти из этого тг '
-                                      'канала))) если кнш не хочешь допустить той ситуации, когда не можешь '
+        await callback.message.answer('Благодарю за подписку, однако, тепепрь, ты не сможешь выйти из '
+                                      'этого тг канала))) если кнш не хочешь допустить той ситуации, когда не можешь '
                                       'подобрать сериальчик или фильмец под хавчик)) Выбор за тобой, друг мой!')
     else:
         await callback.answer()
@@ -77,11 +82,8 @@ async def process_start(message: Message):
 async def send_message(message: Message):
     print(f'{message.from_user.full_name} написал это сообщение: "{message.text}", {datetime.datetime.now()}')
     if await check_sub(message.from_user.id):
-        code: str = message.text.strip()
-        res: str | bool = await fetch_movie_info(code)
-        if res:
-            await message.answer(res)
-        else:
+        res: str | bool = await fetch_movie_info(message)
+        if not(res):
             await message.answer('Погодь, такой команды или кода нет, введи существующий плиз...')
     else:
         await send_inline_button(message)
